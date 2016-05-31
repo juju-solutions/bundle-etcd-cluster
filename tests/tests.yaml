@@ -1,0 +1,3 @@
+reset: true
+packages:
+  - python3-amulet

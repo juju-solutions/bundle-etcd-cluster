@@ -1,0 +1,5 @@
+series: xenial
+services:
+  etcd:
+    charm: /home/charles/projects/work/builds/etcd
+    num_units: 3

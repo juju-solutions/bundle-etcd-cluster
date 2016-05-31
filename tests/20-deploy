@@ -1,0 +1,52 @@
+#!/usr/bin/python3
+
+import amulet
+import os
+import unittest
+import yaml
+
+
+class TestDeployment(unittest.TestCase):
+    bundle_file = os.path.join(os.path.dirname(__file__), '..', 'bundle.yaml')
+
+    @classmethod
+    def setUpClass(cls):
+        cls.d = amulet.Deployment(series='xenial')
+        with open(cls.bundle_file) as f:
+            bun = f.read()
+        bundle = yaml.safe_load(bun)
+        cls.d.load(bundle)
+        cls.d.setup(timeout=900)
+        cls.d.sentry.wait()
+        cls.etcd = cls.d.sentry['etcd']
+
+        # find the leader
+        for unit in cls.etcd:
+            leader_result = unit.run('is-leader')
+            if leader_result[0] == 'True':
+                cls.leader = unit
+
+    def test_leader_status(self):
+        status = self.leader.run('service etcd status')
+        print(status)
+        self.assertTrue("running" in status[0])
+
+    def test_node_scale(self):
+        # Ensure we aren't testing a single node
+        if not len(self.etcd) > 1:
+            self.d.add_unit('etcd')
+            self.d.sentry.wait()
+
+        for unit in self.etcd:
+            status = unit.run('service etcd status')
+            self.assertTrue(status[1] == 1)
+            self.assertTrue("running" in status[0])
+
+    def test_cluster_health(self):
+        for unit in self.etcd:
+            health = unit.run('etcdctl cluster-health')
+            self.assertTrue('unhealthy' not in health)
+
+
+if __name__ == '__main__':
+    unittest.main()
